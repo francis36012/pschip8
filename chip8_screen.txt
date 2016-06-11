@@ -1,0 +1,25 @@
+Screen =
+	default bg: black
+	width: 64px
+	height: 32px
+
+	sprite =
+		width = 8px
+		height = 1px - 15px
+		* on-bit = white pixel
+		* off-bit = transparent
+
+	draw ins (DXYN) =
+		X <= 3F && Y <= 1F
+		Draw sprites (length N) starting at positino VX(reg),VY(reg) with
+		sprite data located at address I(reg). A single byte corresponds to
+		one row of the sprite, e.g. if N is 4, the sprite will be 4 units high
+
+		The draw operation is performed in an exclusive-or (XOR) mode, i.e incoming
+		sprite data is XOR'ed with existing data in the video memory. This mode
+		can be used to clear a sprite by drawing the same sprite at the same
+		location. If a pixel to be drawn happens to have the same state as a corresponding
+		pixel on screen, VF is set to 00, else VF is set to 00
+
+	cls ins (00E0) =
+		Clears the screen

@@ -1,0 +1,8 @@
+[package]
+name = "pschip8"
+version = "0.1.0"
+authors = ["Francis Agayapong <francisagyapong2@gmail.com>"]
+description = "Pretty Simple Chip8 Interpreter"
+
+[dependencies]
+rand = "0.3.*"
