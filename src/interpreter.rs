@@ -84,7 +84,7 @@ pub struct Interpreter {
 }
 
 impl Interpreter {
-    pub fn init() -> Interpreter {
+    pub fn new() -> Interpreter {
         let mut interpreter = Interpreter {
             cpu: Cpu::init(),
             memory: [0; 4096],
