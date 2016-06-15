@@ -74,12 +74,20 @@ const FONT_SPRITES: [u8; 80] = [
     0xf0, 0x80, 0xf0, 0x80, 0x80, // "F"
 ];
 
+struct SoundSystem {
+}
+
+impl SoundSystem {
+    fn resume(&self) {}
+    fn pause(&self) {}
+}
 pub struct Interpreter {
     cpu: Cpu,
     memory: [u8; MEMORY_SIZE as usize],
     stack: [u16; STACK_DEPTH as usize],
     delay_timer: u8,
     sound_timer: u8,
+    sound_system: SoundSystem,
     key: [u8; KEYS_N as usize],
 }
 
@@ -91,6 +99,7 @@ impl Interpreter {
             stack: [0; 16],
             delay_timer: 0,
             sound_timer: 0,
+            sound_system: SoundSystem{},
             key: [0; 16],
         };
         for i in FONT_SPRITES_MEM_START..(FONT_SPRITES_MEM_START + FONT_SPRITES.len() as u16) {
@@ -493,6 +502,9 @@ impl Interpreter {
         let sound_timer = self.sound_timer;
         if sound_timer > 0 {
             self.sound_timer -= 1;
+            self.sound_system.resume();
+        } else {
+            self.sound_system.pause();
         }
 
         let delay_timer = self.delay_timer;
