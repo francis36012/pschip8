@@ -1,9 +1,14 @@
+extern crate sdl2;
+
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 use std::thread;
 use std::time::{Duration, SystemTime};
 use cpu::Cpu;
+
+use self::sdl2::Sdl;
+use self::sdl2::audio::{AudioDevice, AudioCallback, AudioSpecDesired};
 
 /// # Instructions Quick Reference
 /// * 0nnn - SYS addr:       =>   jmp to nnn
@@ -74,12 +79,50 @@ const FONT_SPRITES: [u8; 80] = [
     0xf0, 0x80, 0xf0, 0x80, 0x80, // "F"
 ];
 
+static DESIRED_AUDIO_SPEC: AudioSpecDesired = AudioSpecDesired {
+    freq: Some(44100),
+    channels: Some(1),
+    samples: Some(2048),
+};
+
+struct Tone {
+    phase_inc: f32,
+    phase: f32,
+    volume: f32,
+}
+
+impl AudioCallback for Tone {
+    type Channel = f32;
+
+    fn callback(&mut self, out: &mut [f32]) {
+        for x in out.iter_mut() {
+            *x = match self.phase {
+                0.0...0.5 => self.volume,
+                _ => -self.volume
+            };
+            self.phase = (self.phase + self.phase_inc) % 1.0;
+        }
+    }
+}
+
 struct SoundSystem {
+    au_dev: AudioDevice<Tone>,
 }
 
 impl SoundSystem {
-    fn resume(&self) {}
-    fn pause(&self) {}
+    fn resume(&self) {
+        self.au_dev.resume();
+    }
+
+    fn pause(&self) {
+        self.au_dev.pause();
+    }
+
+    fn new(au_dev: AudioDevice<Tone>) -> Self {
+        SoundSystem {
+            au_dev: au_dev
+        }
+    }
 }
 pub struct Interpreter {
     cpu: Cpu,
@@ -87,19 +130,29 @@ pub struct Interpreter {
     stack: [u16; STACK_DEPTH as usize],
     delay_timer: u8,
     sound_timer: u8,
+    sdl: Sdl,
     sound_system: SoundSystem,
     key: [u8; KEYS_N as usize],
 }
 
 impl Interpreter {
     pub fn new() -> Interpreter {
+        let sdl_ctxt = sdl2::init().unwrap();
+        let au_sys = sdl_ctxt.audio().unwrap();
         let mut interpreter = Interpreter {
             cpu: Cpu::init(),
             memory: [0; 4096],
             stack: [0; 16],
             delay_timer: 0,
             sound_timer: 0,
-            sound_system: SoundSystem{},
+            sdl: sdl_ctxt,
+            sound_system: SoundSystem::new(au_sys.open_playback(None, &DESIRED_AUDIO_SPEC, |spec| {
+                Tone {
+                    phase_inc: 440.0 / spec.freq as f32,
+                    phase: 0.0,
+                    volume: 0.5,
+                }
+            }).unwrap()),
             key: [0; 16],
         };
         for i in FONT_SPRITES_MEM_START..(FONT_SPRITES_MEM_START + FONT_SPRITES.len() as u16) {
@@ -221,6 +274,8 @@ impl Interpreter {
                 self.cpu.registers.pc = nnn;
             },
             0x3 => {
+                self.cpu.registers.pc += INSTRUCTION_WIDTH as u16;
+
                 // 3xkk - SE Vx, byte
                 let x = ((instruction >> 8u16) & 0x000fu16) as u8;
                 let kk = (instruction & 0x00ffu16) as u8;
