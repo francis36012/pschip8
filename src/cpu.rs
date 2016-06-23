@@ -17,7 +17,6 @@ impl Cpu {
         }
     }
     /// Generates a random byte
-    /// TODO: Implement
     pub fn random_byte(&mut self) -> u8 {
         self.rng.gen_range(::std::u8::MIN, ::std::u8::MAX)
     }
