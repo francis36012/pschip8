@@ -7,6 +7,7 @@ use std::thread;
 use std::time::{Duration, SystemTime};
 use cpu::Cpu;
 
+use self::sdl2::render::Renderer;
 use self::sdl2::Sdl;
 use self::sdl2::audio::{AudioDevice, AudioCallback, AudioSpecDesired};
 
@@ -51,9 +52,7 @@ use self::sdl2::audio::{AudioDevice, AudioCallback, AudioSpecDesired};
 
 const INTERPRETER_END: u16 = 512;
 const FONT_SPRITES_MEM_START: u16 = 0;
-#[allow(dead_code)]
 const SCREEN_WIDTH: u8 = 128;
-#[allow(dead_code)]
 const SCREEN_HEIGHT: u8 = 64;
 const MEMORY_SIZE: u16 = 4096;
 const STACK_DEPTH: u8 = 16;
@@ -84,6 +83,24 @@ static DESIRED_AUDIO_SPEC: AudioSpecDesired = AudioSpecDesired {
     channels: Some(1),
     samples: Some(2048),
 };
+
+struct VideoSystem<'a> {
+    width: u8,
+    height: u8,
+    memory: Vec<bool>,
+    renderer: Renderer<'a>,
+}
+
+impl <'a> VideoSystem<'a> {
+    fn default(renderer: Renderer<'a>) -> Self {
+        VideoSystem {
+            width: SCREEN_WIDTH,
+            height: SCREEN_HEIGHT,
+            memory: Vec::with_capacity((SCREEN_WIDTH as usize) * (SCREEN_HEIGHT as usize)),
+            renderer: renderer
+        }
+    }
+}
 
 struct Tone {
     phase_inc: f32,
@@ -284,6 +301,7 @@ impl Interpreter {
                 if vx == kk { self.cpu.registers.pc += INSTRUCTION_WIDTH as u16 }
             },
             0x4 => {
+                self.cpu.registers.pc += INSTRUCTION_WIDTH as u16;
                 // 4xkk - SNE Vx, byte
                 let x = ((instruction >> 8u16) & 0x000fu16) as u8;
                 let kk = (instruction & 0x00ffu16) as u8;
@@ -292,6 +310,7 @@ impl Interpreter {
                 if vx != kk { self.cpu.registers.pc += INSTRUCTION_WIDTH as u16 }
             },
             0x5 => {
+                self.cpu.registers.pc += INSTRUCTION_WIDTH as u16;
                 // 4xy0 - SE Vx, Vy
                 let x = ((instruction >> 8u16) & 0x000fu16) as u8;
                 let y = (instruction >> 4u16 & 0x000fu16) as u8;
