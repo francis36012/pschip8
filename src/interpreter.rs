@@ -58,6 +58,7 @@ const MEMORY_SIZE: u16 = 4096;
 const STACK_DEPTH: u8 = 16;
 const KEYS_N: u8 = 16;
 const INSTRUCTION_WIDTH: u8 = 2;
+const MAX_SPRITE_LENGTH: u8 = 15;
 
 const FONT_SPRITES: [u8; 80] = [
     0xf0, 0x90, 0x90, 0x90, 0xf0, // "0"
@@ -99,6 +100,31 @@ impl <'a> VideoSystem<'a> {
             memory: Vec::with_capacity((SCREEN_WIDTH as usize) * (SCREEN_HEIGHT as usize)),
             renderer: renderer
         }
+    }
+
+    fn draw(&mut self, x: u8, y: u8, sprite: &[u8]) -> bool {
+        let mut erased = false;
+        let sprite_len = sprite.len();
+
+        if (x >= self.width) || (y >= self.height) || (sprite_len as u8 > MAX_SPRITE_LENGTH) {
+            return erased;
+        }
+        let mut i = y;
+        while (i - y) < sprite_len as u8 && (i < self.height) {
+            let start = i * self.width + x;
+            let vidlim = i * self.width + self.width;
+
+            let mut j = start;
+            while (j < start + 8) && (j < vidlim) {
+                let shifts = (8 - (j - start)) - 1;
+                let prev = self.memory[j as usize];
+                let new = ((sprite[(i - y) as usize] >> shifts) & 0x1) == 1;
+                erased = if !erased { !new && prev } else { erased };
+                j += 1;
+            }
+            i += 1
+        }
+        erased
     }
 }
 
