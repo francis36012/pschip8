@@ -8,8 +8,10 @@ use std::time::{Duration, SystemTime};
 use cpu::Cpu;
 
 use self::sdl2::render::Renderer;
-use self::sdl2::Sdl;
+use self::sdl2::{VideoSubsystem, Sdl};
 use self::sdl2::audio::{AudioDevice, AudioCallback, AudioSpecDesired};
+use self::sdl2::pixels::Color;
+use self::sdl2::rect::Point;
 
 /// # Instructions Quick Reference
 /// * 0nnn - SYS addr:       =>   jmp to nnn
@@ -60,6 +62,9 @@ const KEYS_N: u8 = 16;
 const INSTRUCTION_WIDTH: u8 = 2;
 const MAX_SPRITE_LENGTH: u8 = 15;
 
+static DEFAULT_WINDOW_TITLE: &'static str = "pschip8";
+const DEFAULT_VIDEO_SCALE: u8 = 4;
+
 const FONT_SPRITES: [u8; 80] = [
     0xf0, 0x90, 0x90, 0x90, 0xf0, // "0"
     0x20, 0x60, 0x20, 0x20, 0x70, // "1"
@@ -88,17 +93,23 @@ static DESIRED_AUDIO_SPEC: AudioSpecDesired = AudioSpecDesired {
 struct VideoSystem<'a> {
     width: u8,
     height: u8,
+    scale_factor: u8,
     memory: Vec<bool>,
     renderer: Renderer<'a>,
 }
 
 impl <'a> VideoSystem<'a> {
-    fn default(renderer: Renderer<'a>) -> Self {
+    fn default(video_sys: &VideoSubsystem) -> Self {
+        let window = video_sys.window(DEFAULT_WINDOW_TITLE,
+                            SCREEN_WIDTH as u32 * DEFAULT_VIDEO_SCALE as u32,
+                            SCREEN_HEIGHT as u32 * DEFAULT_VIDEO_SCALE as u32).build().unwrap();
+
         VideoSystem {
             width: SCREEN_WIDTH,
             height: SCREEN_HEIGHT,
-            memory: Vec::with_capacity((SCREEN_WIDTH as usize) * (SCREEN_HEIGHT as usize)),
-            renderer: renderer
+            scale_factor: DEFAULT_VIDEO_SCALE,
+            memory: vec![false; ((SCREEN_WIDTH as usize) * (SCREEN_HEIGHT as usize))],
+            renderer: window.renderer().present_vsync().build().unwrap(),
         }
     }
 
@@ -111,20 +122,47 @@ impl <'a> VideoSystem<'a> {
         }
         let mut i = y;
         while (i - y) < sprite_len as u8 && (i < self.height) {
-            let start = i * self.width + x;
-            let vidlim = i * self.width + self.width;
+            let start = i as usize * self.width as usize + x as usize;
+            let vidlim = i as usize * self.width as usize + self.width as usize;
 
             let mut j = start;
             while (j < start + 8) && (j < vidlim) {
                 let shifts = (8 - (j - start)) - 1;
                 let prev = self.memory[j as usize];
                 let new = ((sprite[(i - y) as usize] >> shifts) & 0x1) == 1;
-                erased = if !erased { !new && prev } else { erased };
+                self.memory[j] = prev != new;
+                erased = if !erased { (new && prev) || (!new && prev) } else { erased };
                 j += 1;
             }
             i += 1
         }
         erased
+    }
+
+    fn render_screen(&mut self) {
+        self.renderer.set_scale(self.scale_factor as f32, self.scale_factor as f32);
+        self.renderer.set_draw_color(Color::RGB(0, 0, 0));
+        self.renderer.clear();
+
+        for (index, pixel) in self.memory.iter().enumerate() {
+            let y = index / self.width as usize;
+            let x = index - (y * self.width as usize);
+
+            let color = if *pixel {
+                Color::RGB(255, 255, 255)
+            } else {
+                Color::RGB(0, 0, 0)
+            };
+            self.renderer.set_draw_color(color);
+            self.renderer.draw_point(Point::new(x as i32, y as i32));
+        }
+        self.renderer.present();
+    }
+
+    fn clear_screen(&mut self) {
+        for idx in 0..self.memory.len() {
+            self.memory[idx] = false;
+        }
     }
 }
 
@@ -167,7 +205,7 @@ impl SoundSystem {
         }
     }
 }
-pub struct Interpreter {
+pub struct Interpreter<'a> {
     cpu: Cpu,
     memory: [u8; MEMORY_SIZE as usize],
     stack: [u16; STACK_DEPTH as usize],
@@ -175,13 +213,16 @@ pub struct Interpreter {
     sound_timer: u8,
     sdl: Sdl,
     sound_system: SoundSystem,
+    video_system: VideoSystem<'a>,
     key: [u8; KEYS_N as usize],
 }
 
-impl Interpreter {
-    pub fn new() -> Interpreter {
+impl <'a> Interpreter<'a> {
+    pub fn new() -> Interpreter<'a> {
         let sdl_ctxt = sdl2::init().unwrap();
         let au_sys = sdl_ctxt.audio().unwrap();
+        let vd_sys = sdl_ctxt.video().unwrap();
+
         let mut interpreter = Interpreter {
             cpu: Cpu::init(),
             memory: [0; 4096],
@@ -196,6 +237,7 @@ impl Interpreter {
                     volume: 0.5,
                 }
             }).unwrap()),
+            video_system: VideoSystem::default(&vd_sys),
             key: [0; 16],
         };
         for i in FONT_SPRITES_MEM_START..(FONT_SPRITES_MEM_START + FONT_SPRITES.len() as u16) {
@@ -285,6 +327,7 @@ impl Interpreter {
                 // clear screen
                 if lnnn == 0x00e0 {
                     self.cpu.registers.pc += INSTRUCTION_WIDTH as u16;
+                    self.video_system.clear_screen();
 
                 // return from subroutine
                 } else if lnnn == 0x00ee {
@@ -490,8 +533,10 @@ impl Interpreter {
                 // Dxyn - DRW Vx, Vy, nibble
                 let x = ((instruction >> 8u16) & 0x000fu16) as u8;
                 let y = (instruction >> 4u16 & 0x000fu16) as u8;
-                let n = (instruction & 0x000fu16) as u8;
-                // TODO: Draw
+                let n = instruction & 0x000fu16;
+                let i = self.cpu.registers.i;
+                let sprite = &self.memory[(i as usize..(i+n) as usize)];
+                self.video_system.draw(self.cpu.registers.get(x).unwrap_or(0), self.cpu.registers.get(y).unwrap_or(0), sprite);
             },
             0xe => {
                 let x = ((instruction >> 8u16) & 0x000fu16) as u8;
@@ -542,7 +587,7 @@ impl Interpreter {
                         let x = ((instruction >> 8u16) & 0x000fu16) as u8;
                         let vx = self.cpu.registers.get(x).unwrap() as u16;
                         if vx <= 0xf {
-                            self.cpu.registers.i = FONT_SPRITES_MEM_START + (vx as u16);
+                            self.cpu.registers.i = FONT_SPRITES_MEM_START + (vx as u16 * 5);
                         }
                     },
                     // Fx33 - LD B, Vx
@@ -552,7 +597,6 @@ impl Interpreter {
                         let vx_bcd = u8_to_bcd(vx);
                         let ireg = self.cpu.registers.i as usize;
 
-                        println!("BCD of {}: {:?}", vx, vx_bcd);
                         for i in 0..3 {
                             self.memory[ireg + i] = vx_bcd[i];
                         }
@@ -591,9 +635,11 @@ impl Interpreter {
             self.cycle();
             self.input_routine();
             self.timer_routine();
-            self.render_screen();
+            self.video_system.render_screen();
             let elapsed = SystemTime::now().duration_since(time_start).unwrap();
-            thread::sleep(spf_nano - elapsed);
+            if elapsed < spf_nano {
+                thread::sleep(spf_nano - elapsed);
+            }
         }
     }
 
@@ -611,10 +657,6 @@ impl Interpreter {
         if delay_timer > 0 {
             self.delay_timer -= 1;
         }
-    }
-
-    /// Renders the contents of the video memory to screen
-    fn render_screen(&mut self) {
     }
 
     fn input_routine(&mut self) {
