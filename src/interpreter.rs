@@ -536,7 +536,8 @@ impl <'a> Interpreter<'a> {
                 let n = instruction & 0x000fu16;
                 let i = self.cpu.registers.i;
                 let sprite = &self.memory[(i as usize..(i+n) as usize)];
-                self.video_system.draw(self.cpu.registers.get(x).unwrap_or(0), self.cpu.registers.get(y).unwrap_or(0), sprite);
+                let erased = self.video_system.draw(self.cpu.registers.get(x).unwrap_or(0), self.cpu.registers.get(y).unwrap_or(0), sprite);
+                self.cpu.registers.vf = if erased { 1 } else { 0 };
             },
             0xe => {
                 let x = ((instruction >> 8u16) & 0x000fu16) as u8;
