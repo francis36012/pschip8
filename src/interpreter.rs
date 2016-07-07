@@ -54,8 +54,8 @@ use self::sdl2::rect::Point;
 
 const INTERPRETER_END: u16 = 512;
 const FONT_SPRITES_MEM_START: u16 = 0;
-const SCREEN_WIDTH: u8 = 128;
-const SCREEN_HEIGHT: u8 = 64;
+const SCREEN_WIDTH: u8 = 64;
+const SCREEN_HEIGHT: u8 = 32;
 const MEMORY_SIZE: u16 = 4096;
 const STACK_DEPTH: u8 = 16;
 const KEYS_N: u8 = 16;
