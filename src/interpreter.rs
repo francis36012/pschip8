@@ -8,7 +8,9 @@ use std::time::{Duration, SystemTime};
 use cpu::Cpu;
 
 use self::sdl2::render::Renderer;
-use self::sdl2::{VideoSubsystem, Sdl};
+use self::sdl2::event::Event;
+use self::sdl2::keyboard::Keycode;
+use self::sdl2::{VideoSubsystem, Sdl, EventPump};
 use self::sdl2::audio::{AudioDevice, AudioCallback, AudioSpecDesired};
 use self::sdl2::pixels::Color;
 use self::sdl2::rect::Point;
@@ -58,7 +60,6 @@ const SCREEN_WIDTH: u8 = 64;
 const SCREEN_HEIGHT: u8 = 32;
 const MEMORY_SIZE: u16 = 4096;
 const STACK_DEPTH: u8 = 16;
-const KEYS_N: u8 = 16;
 const INSTRUCTION_WIDTH: u8 = 2;
 const MAX_SPRITE_LENGTH: u8 = 15;
 
@@ -214,7 +215,7 @@ pub struct Interpreter<'a> {
     sdl: Sdl,
     sound_system: SoundSystem,
     video_system: VideoSystem<'a>,
-    key: [u8; KEYS_N as usize],
+    event_pump: EventPump,
 }
 
 impl <'a> Interpreter<'a> {
@@ -223,6 +224,7 @@ impl <'a> Interpreter<'a> {
         let sdl_ctxt = sdl2::init().unwrap();
         let au_sys = sdl_ctxt.audio().unwrap();
         let vd_sys = sdl_ctxt.video().unwrap();
+        let evt_pump = sdl_ctxt.event_pump().unwrap();
 
         let mut interpreter = Interpreter {
             cpu: Cpu::init(),
@@ -239,7 +241,7 @@ impl <'a> Interpreter<'a> {
                 }
             }).unwrap()),
             video_system: VideoSystem::default(&vd_sys),
-            key: [0; 16],
+            event_pump: evt_pump,
         };
         for i in FONT_SPRITES_MEM_START..(FONT_SPRITES_MEM_START + FONT_SPRITES.len() as u16) {
             interpreter.memory[i as usize] = FONT_SPRITES[(i - FONT_SPRITES_MEM_START) as usize];
@@ -574,7 +576,84 @@ impl <'a> Interpreter<'a> {
                     },
                     // Fx0a - LD Vx, K
                     0x0a => {
-                        // TODO: wait for key press and store it in Vx
+                        'event_loop: loop {
+                            let event = self.event_pump.wait_event();
+                            match event {
+                                Event::KeyDown{keycode: kc, ..} => {
+                                    println!("Keycode:\n{:?}\n", kc);
+                                    match kc {
+                                        Some(Keycode::Num0) | Some(Keycode::Kp0) => {
+                                            self.cpu.registers.set(x, 0);
+                                            break 'event_loop
+                                        },
+                                        Some(Keycode::Num1) | Some(Keycode::Kp1) => {
+                                            self.cpu.registers.set(x, 1);
+                                            break 'event_loop
+                                        },
+                                        Some(Keycode::Num2) | Some(Keycode::Kp2) => {
+                                            self.cpu.registers.set(x, 2);
+                                            break 'event_loop
+                                        },
+                                        Some(Keycode::Num3) | Some(Keycode::Kp3) => {
+                                            self.cpu.registers.set(x, 3);
+                                            break 'event_loop
+                                        },
+                                        Some(Keycode::Num4) | Some(Keycode::Kp4) => {
+                                            self.cpu.registers.set(x, 4);
+                                            break 'event_loop
+                                        },
+                                        Some(Keycode::Num5) | Some(Keycode::Kp5) => {
+                                            self.cpu.registers.set(x, 5);
+                                            break 'event_loop
+                                        },
+                                        Some(Keycode::Num6) | Some(Keycode::Kp6) => {
+                                            self.cpu.registers.set(x, 6);
+                                            break 'event_loop
+                                        },
+                                        Some(Keycode::Num7) | Some(Keycode::Kp7) => {
+                                            self.cpu.registers.set(x, 7);
+                                            break 'event_loop
+                                        },
+                                        Some(Keycode::Num8) | Some(Keycode::Kp8) => {
+                                            self.cpu.registers.set(x, 8);
+                                            break 'event_loop
+                                        },
+                                        Some(Keycode::Num9) | Some(Keycode::Kp9) => {
+                                            self.cpu.registers.set(x, 9);
+                                            break 'event_loop
+                                        },
+                                        Some(Keycode::A) => {
+                                            self.cpu.registers.set(x, 0xa);
+                                            break 'event_loop
+                                        },
+                                        Some(Keycode::B) => {
+                                            self.cpu.registers.set(x, 0xb);
+                                            break 'event_loop
+                                        },
+                                        Some(Keycode::C) => {
+                                            self.cpu.registers.set(x, 0xc);
+                                            break 'event_loop
+                                        },
+                                        Some(Keycode::D) => {
+                                            self.cpu.registers.set(x, 0xd);
+                                            break 'event_loop
+                                        },
+                                        Some(Keycode::E) => {
+                                            self.cpu.registers.set(x, 0xe);
+                                            break 'event_loop
+                                        },
+                                        Some(Keycode::F) => {
+                                            self.cpu.registers.set(x, 0xf);
+                                            break 'event_loop
+                                        },
+                                        // If the keycode does not match [0-9a-f] continue the loop
+                                        _ => {}
+                                    }
+                                },
+                                        // If the event is not a keydown event, continue the loop
+                                _ => {}
+                            }
+                        }
                     },
                     // Fx15 - LD  DT, Vx
                     0x15 => {
