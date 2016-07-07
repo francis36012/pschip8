@@ -63,7 +63,7 @@ const INSTRUCTION_WIDTH: u8 = 2;
 const MAX_SPRITE_LENGTH: u8 = 15;
 
 static DEFAULT_WINDOW_TITLE: &'static str = "pschip8";
-const DEFAULT_VIDEO_SCALE: u8 = 4;
+const DEFAULT_VIDEO_SCALE: u8 = 8;
 
 const FONT_SPRITES: [u8; 80] = [
     0xf0, 0x90, 0x90, 0x90, 0xf0, // "0"
@@ -218,6 +218,7 @@ pub struct Interpreter<'a> {
 }
 
 impl <'a> Interpreter<'a> {
+    /// Creates and initializes an interpreter
     pub fn new() -> Interpreter<'a> {
         let sdl_ctxt = sdl2::init().unwrap();
         let au_sys = sdl_ctxt.audio().unwrap();
@@ -246,6 +247,7 @@ impl <'a> Interpreter<'a> {
         interpreter
     }
 
+    /// Loads a program into the interpreter from the file pointed to by path argument
     pub fn load_program_from_file(&mut self, path: &Path) {
         let mut file = File::open(path).unwrap();
         let mut mem_idx = INTERPRETER_END as usize;
@@ -262,6 +264,7 @@ impl <'a> Interpreter<'a> {
         self.cpu.registers.pc = INTERPRETER_END;
     }
 
+    /// Loads a program into the interpreter from a slice of u16
     pub fn load_from_bytes(&mut self, instructions: &[u16]) {
         if instructions.len() > (MEMORY_SIZE - INTERPRETER_END) as usize {
             panic!();
@@ -275,6 +278,7 @@ impl <'a> Interpreter<'a> {
         self.cpu.registers.pc = INTERPRETER_END;
     }
 
+    /// Prints the contents of the interpreter's memory
     pub fn print_memory(&self) {
         println!("Memory:");
         let mut lidx = 0;
@@ -294,6 +298,7 @@ impl <'a> Interpreter<'a> {
         println!("\n");
     }
 
+    /// Prints the contents of the various registers, including PC, I, and SP
     pub fn print_registers(&self) {
         println!("Registers:");
         println!("V0: {}, V1: {}, V2: {}, V3: {}",
@@ -314,6 +319,7 @@ impl <'a> Interpreter<'a> {
         println!("");
     }
 
+    /// Executes a single instruction (retrieved via fetch)
     fn cycle(&mut self) {
         let instruction = self.fetch();
         let opcode = ((instruction & 0xf000u16) >> 12) as u8;
@@ -628,13 +634,14 @@ impl <'a> Interpreter<'a> {
         }
     }
 
+    /// After initializing the interpreter, this method should be called to start
+    /// running
     pub fn run(&mut self) {
         // nanoseconds per frame
         let spf_nano = Duration::new(0, 16_666_666);
         loop {
             let time_start = SystemTime::now();
             self.cycle();
-            self.input_routine();
             self.timer_routine();
             self.video_system.render_screen();
             let elapsed = SystemTime::now().duration_since(time_start).unwrap();
@@ -660,9 +667,7 @@ impl <'a> Interpreter<'a> {
         }
     }
 
-    fn input_routine(&mut self) {
-    }
-
+    /// Fetches the next instruction to be executed by the interpreter
     fn fetch(&self) -> u16 {
         let pc = self.cpu.registers.pc as usize;
         ((self.memory[pc] as u16) << 8) | self.memory[(pc + 1) as usize] as u16
