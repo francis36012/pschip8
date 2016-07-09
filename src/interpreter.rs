@@ -10,6 +10,7 @@ use cpu::Cpu;
 use self::sdl2::render::Renderer;
 use self::sdl2::event::Event;
 use self::sdl2::keyboard::Keycode;
+use self::sdl2::keyboard::Scancode;
 use self::sdl2::{VideoSubsystem, Sdl, EventPump};
 use self::sdl2::audio::{AudioDevice, AudioCallback, AudioSpecDesired};
 use self::sdl2::pixels::Color;
@@ -559,7 +560,85 @@ impl <'a> Interpreter<'a> {
                     },
                     // Exa1 - SKNP Vx
                     0xa1 => {
-                        // TODO: Skip if value of key pressed does not equal value of Vx
+                        let mut skip = true;
+                        for event in self.event_pump.poll_iter() {
+                            println!("k: {:?}, rk: {:?}", event, self.cpu.registers.get(x));
+                            match event {
+                                Event::KeyDown{scancode: sc,..} => {
+                                    match sc {
+                                        Some(Scancode::Num0) | Some(Scancode::Kp0) if (self.cpu.registers.get(x).unwrap() == 0) => {
+                                            skip = false;
+                                            break;
+                                        },
+                                        Some(Scancode::Num1) | Some(Scancode::Kp1) if (self.cpu.registers.get(x).unwrap() == 1) => {
+                                            skip = false;
+                                            break;
+                                        },
+                                        Some(Scancode::Num2) | Some(Scancode::Kp2) if (self.cpu.registers.get(x).unwrap() == 2) => {
+                                            skip = false;
+                                            break;
+                                        },
+                                        Some(Scancode::Num3) | Some(Scancode::Kp3) if (self.cpu.registers.get(x).unwrap() == 3) => {
+                                            skip = false;
+                                            break;
+                                        },
+                                        Some(Scancode::Num4) | Some(Scancode::Kp4) if (self.cpu.registers.get(x).unwrap() == 4) => {
+                                            skip = false;
+                                            break;
+                                        },
+                                        Some(Scancode::Num5) | Some(Scancode::Kp5) if (self.cpu.registers.get(x).unwrap() == 5) => {
+                                            skip = false;
+                                            break;
+                                        },
+                                        Some(Scancode::Num6) | Some(Scancode::Kp6) if (self.cpu.registers.get(x).unwrap() == 6) => {
+                                            skip = false;
+                                            break;
+                                        },
+                                        Some(Scancode::Num7) | Some(Scancode::Kp7) if (self.cpu.registers.get(x).unwrap() == 7) => {
+                                            skip = false;
+                                            break;
+                                        },
+                                        Some(Scancode::Num8) | Some(Scancode::Kp8) if (self.cpu.registers.get(x).unwrap() == 8) => {
+                                            skip = false;
+                                            break;
+                                        },
+                                        Some(Scancode::Num9) | Some(Scancode::Kp9) if (self.cpu.registers.get(x).unwrap() == 9) => {
+                                            skip = false;
+                                            break;
+                                        },
+                                        Some(Scancode::A) if (self.cpu.registers.get(x).unwrap() == 0xa) => {
+                                            skip = false;
+                                            break;
+                                        },
+                                        Some(Scancode::B) if (self.cpu.registers.get(x).unwrap() == 0xb) => {
+                                            skip = false;
+                                            break;
+                                        },
+                                        Some(Scancode::C) if (self.cpu.registers.get(x).unwrap() == 0xc) => {
+                                            skip = false;
+                                            break;
+                                        },
+                                        Some(Scancode::D) if (self.cpu.registers.get(x).unwrap() == 0xd) => {
+                                            skip = false;
+                                            break;
+                                        },
+                                        Some(Scancode::E) if (self.cpu.registers.get(x).unwrap() == 0xe) => {
+                                            skip = false;
+                                            break;
+                                        },
+                                        Some(Scancode::F) if (self.cpu.registers.get(x).unwrap() == 0xf) => {
+                                            skip = false;
+                                            break;
+                                        },
+                                        _ => {}
+                                    }
+                                },
+                                _ => {},
+                            }
+                        }
+                        if skip {
+                            self.cpu.registers.pc += INSTRUCTION_WIDTH as u16;
+                        }
                     },
                     _ => { }
                 }
