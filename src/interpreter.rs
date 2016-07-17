@@ -133,7 +133,7 @@ impl <'a> VideoSystem<'a> {
                 let prev = self.memory[j as usize];
                 let new = ((sprite[(i - y) as usize] >> shifts) & 0x1) == 1;
                 self.memory[j] = prev != new;
-                erased = if !erased { (new && prev) || (!new && prev) } else { erased };
+                erased = if prev && new { true } else { erased };
                 j += 1;
             }
             i += 1
@@ -350,6 +350,8 @@ impl <'a> Interpreter<'a> {
                         _ => 0
                     };
                     self.cpu.registers.pc = self.stack[sp as usize];
+                } else {
+                    self.cpu.registers.pc += INSTRUCTION_WIDTH as u16;
                 }
             },
             0x1 => {
@@ -475,12 +477,9 @@ impl <'a> Interpreter<'a> {
                     // 8xy6 - SHR Vx {, Vy}
                     0x6 => {
                         let vx = self.cpu.registers.get(x).unwrap();
-                        if (vx & 0x01) == 0x01 {
-                            self.cpu.registers.vf = 1;
-                        } else {
-                            self.cpu.registers.vf = 0;
-                        }
-                        self.cpu.registers.set(x, ((vx as usize) >> 1) as u8);
+                        let vy = self.cpu.registers.get(x).unwrap();
+                        self.cpu.registers.vf = vx & 0x01;
+                        self.cpu.registers.set(x, ((vy as usize) >> 1) as u8);
                     },
                     // 8xy7 - SUBN Vx ,Vy
                     0x7 => {
@@ -498,12 +497,9 @@ impl <'a> Interpreter<'a> {
                     // 8xy6 - SHL Vx {, Vy}
                     0xe => {
                         let vx = self.cpu.registers.get(x).unwrap();
-                        if (vx & 0x10) == 0x10 {
-                            self.cpu.registers.vf = 1;
-                        } else {
-                            self.cpu.registers.vf = 0;
-                        }
-                        self.cpu.registers.set(x, ((vx as usize) << 1) as u8);
+                        let vy = self.cpu.registers.get(x).unwrap();
+                        self.cpu.registers.vf = vx & 0x10;
+                        self.cpu.registers.set(x, ((vy as usize) << 1) as u8);
                     },
                     _ => { }
                 }
