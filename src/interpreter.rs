@@ -98,6 +98,7 @@ struct VideoSystem<'a> {
     scale_factor: u8,
     memory: Vec<bool>,
     renderer: Renderer<'a>,
+	draw: bool,
 }
 
 impl <'a> VideoSystem<'a> {
@@ -112,10 +113,12 @@ impl <'a> VideoSystem<'a> {
             scale_factor: DEFAULT_VIDEO_SCALE,
             memory: vec![false; ((SCREEN_WIDTH as usize) * (SCREEN_HEIGHT as usize))],
             renderer: window.renderer().present_vsync().build().unwrap(),
+			draw: true,
         }
     }
 
     fn draw(&mut self, x: u8, y: u8, sprite: &[u8]) -> bool {
+		let time_start = SystemTime::now();
         let mut erased = false;
         let sprite_len = sprite.len();
 
@@ -138,10 +141,16 @@ impl <'a> VideoSystem<'a> {
             }
             i += 1
         }
+		self.draw = true;
+		let elapsed = SystemTime::now().duration_since(time_start).unwrap();
+		println!("[draw][elapsed time]  {:?}", elapsed);
         erased
     }
 
     fn render_screen(&mut self) {
+		if !self.draw {
+			return;
+		}
         self.renderer.set_scale(self.scale_factor as f32, self.scale_factor as f32);
         self.renderer.set_draw_color(Color::RGB(0, 0, 0));
         self.renderer.clear();
@@ -159,6 +168,7 @@ impl <'a> VideoSystem<'a> {
             self.renderer.draw_point(Point::new(x as i32, y as i32));
         }
         self.renderer.present();
+		self.draw = false;
     }
 
     fn clear_screen(&mut self) {
@@ -327,8 +337,8 @@ impl <'a> Interpreter<'a> {
         let instruction = self.fetch();
         let opcode = ((instruction & 0xf000u16) >> 12) as u8;
 
-        println!("[DEBUG]  About to execute: 0x{:x}", instruction);
-        self.print_registers();
+        //println!("[DEBUG]  About to execute: 0x{:x}", instruction);
+        //self.print_registers();
 
         match opcode {
             0x0 => {
@@ -558,7 +568,7 @@ impl <'a> Interpreter<'a> {
                     0xa1 => {
                         let mut skip = true;
                         for event in self.event_pump.poll_iter() {
-                            println!("k: {:?}, rk: {:?}", event, self.cpu.registers.get(x));
+                            //println!("k: {:?}, rk: {:?}", event, self.cpu.registers.get(x));
                             match event {
                                 Event::KeyDown{scancode: sc,..} => {
                                     match sc {
@@ -655,7 +665,7 @@ impl <'a> Interpreter<'a> {
                             let event = self.event_pump.wait_event();
                             match event {
                                 Event::KeyDown{keycode: kc, ..} => {
-                                    println!("Keycode:\n{:?}\n", kc);
+                                    //println!("Keycode:\n{:?}\n", kc);
                                     match kc {
                                         Some(Keycode::Num0) | Some(Keycode::Kp0) => {
                                             self.cpu.registers.set(x, 0);
@@ -792,7 +802,7 @@ impl <'a> Interpreter<'a> {
     /// running
     pub fn run(&mut self) {
         // nanoseconds per frame
-        let spf_nano = Duration::new(0, 16_666_666);
+        let spf_nano = Duration::new(0, 1_000_000);
         loop {
             let time_start = SystemTime::now();
             self.cycle();
