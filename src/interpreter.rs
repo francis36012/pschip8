@@ -5,6 +5,7 @@ use std::io::Read;
 use std::path::Path;
 use std::thread;
 use std::time::{Duration, SystemTime};
+use std::collections::HashSet;
 use cpu::Cpu;
 
 use self::sdl2::render::Renderer;
@@ -98,7 +99,7 @@ struct VideoSystem<'a> {
     scale_factor: u8,
     memory: Vec<bool>,
     renderer: Renderer<'a>,
-	draw: bool,
+    draw: bool,
 }
 
 impl <'a> VideoSystem<'a> {
@@ -113,12 +114,12 @@ impl <'a> VideoSystem<'a> {
             scale_factor: DEFAULT_VIDEO_SCALE,
             memory: vec![false; ((SCREEN_WIDTH as usize) * (SCREEN_HEIGHT as usize))],
             renderer: window.renderer().present_vsync().build().unwrap(),
-			draw: true,
+            draw: true,
         }
     }
 
     fn draw(&mut self, x: u8, y: u8, sprite: &[u8]) -> bool {
-		let time_start = SystemTime::now();
+        let time_start = SystemTime::now();
         let mut erased = false;
         let sprite_len = sprite.len();
 
@@ -141,16 +142,15 @@ impl <'a> VideoSystem<'a> {
             }
             i += 1
         }
-		self.draw = true;
-		let elapsed = SystemTime::now().duration_since(time_start).unwrap();
-		println!("[draw][elapsed time]  {:?}", elapsed);
+        self.draw = true;
+        let elapsed = SystemTime::now().duration_since(time_start).unwrap();
         erased
     }
 
     fn render_screen(&mut self) {
-		if !self.draw {
-			return;
-		}
+        if !self.draw {
+            return;
+        }
         self.renderer.set_scale(self.scale_factor as f32, self.scale_factor as f32);
         self.renderer.set_draw_color(Color::RGB(0, 0, 0));
         self.renderer.clear();
@@ -168,7 +168,7 @@ impl <'a> VideoSystem<'a> {
             self.renderer.draw_point(Point::new(x as i32, y as i32));
         }
         self.renderer.present();
-		self.draw = false;
+        self.draw = false;
     }
 
     fn clear_screen(&mut self) {
@@ -562,86 +562,64 @@ impl <'a> Interpreter<'a> {
                 match kk {
                     // Ex9e - SKP Vx
                     0x9e => {
-                        // TODO: Skip if value of key pressed equals Vx
+                        let mut skip = false;
+                        let reg_value = self.cpu.registers.get(x).unwrap();
+                        self.event_pump.pump_events();
+                        let keyboard_state = self.event_pump.keyboard_state();
+
+                        let pressed_keys: HashSet<Scancode> = keyboard_state.pressed_scancodes().collect();
+                        match reg_value {
+                            0 => { if pressed_keys.contains(&Scancode::Num0) || pressed_keys.contains(&Scancode::Kp0) { skip = true } },
+                            1 => { if pressed_keys.contains(&Scancode::Num1) || pressed_keys.contains(&Scancode::Kp1) { skip = true } },
+                            2 => { if pressed_keys.contains(&Scancode::Num2) || pressed_keys.contains(&Scancode::Kp2) { skip = true } },
+                            3 => { if pressed_keys.contains(&Scancode::Num3) || pressed_keys.contains(&Scancode::Kp3) { skip = true } },
+                            4 => { if pressed_keys.contains(&Scancode::Num4) || pressed_keys.contains(&Scancode::Kp4) { skip = true } },
+                            5 => { if pressed_keys.contains(&Scancode::Num5) || pressed_keys.contains(&Scancode::Kp5) { skip = true } },
+                            6 => { if pressed_keys.contains(&Scancode::Num6) || pressed_keys.contains(&Scancode::Kp6) { skip = true } },
+                            7 => { if pressed_keys.contains(&Scancode::Num7) || pressed_keys.contains(&Scancode::Kp7) { skip = true } },
+                            8 => { if pressed_keys.contains(&Scancode::Num8) || pressed_keys.contains(&Scancode::Kp8) { skip = true } },
+                            9 => { if pressed_keys.contains(&Scancode::Num9) || pressed_keys.contains(&Scancode::Kp9) { skip = true } },
+                            0xa => { if pressed_keys.contains(&Scancode::A) { skip = true } },
+                            0xb => { if pressed_keys.contains(&Scancode::B) { skip = true } },
+                            0xc => { if pressed_keys.contains(&Scancode::C) { skip = true } },
+                            0xd => { if pressed_keys.contains(&Scancode::D) { skip = true } },
+                            0xe => { if pressed_keys.contains(&Scancode::E) { skip = true } },
+                            0xf => { if pressed_keys.contains(&Scancode::F) { skip = true } },
+                            _ => {}
+                        }
+
+                        if skip {
+                            self.cpu.registers.pc += INSTRUCTION_WIDTH as u16;
+                        }
                     },
                     // Exa1 - SKNP Vx
                     0xa1 => {
                         let mut skip = true;
-                        for event in self.event_pump.poll_iter() {
-                            //println!("k: {:?}, rk: {:?}", event, self.cpu.registers.get(x));
-                            match event {
-                                Event::KeyDown{scancode: sc,..} => {
-                                    match sc {
-                                        Some(Scancode::Num0) | Some(Scancode::Kp0) if (self.cpu.registers.get(x).unwrap() == 0) => {
-                                            skip = false;
-                                            break;
-                                        },
-                                        Some(Scancode::Num1) | Some(Scancode::Kp1) if (self.cpu.registers.get(x).unwrap() == 1) => {
-                                            skip = false;
-                                            break;
-                                        },
-                                        Some(Scancode::Num2) | Some(Scancode::Kp2) if (self.cpu.registers.get(x).unwrap() == 2) => {
-                                            skip = false;
-                                            break;
-                                        },
-                                        Some(Scancode::Num3) | Some(Scancode::Kp3) if (self.cpu.registers.get(x).unwrap() == 3) => {
-                                            skip = false;
-                                            break;
-                                        },
-                                        Some(Scancode::Num4) | Some(Scancode::Kp4) if (self.cpu.registers.get(x).unwrap() == 4) => {
-                                            skip = false;
-                                            break;
-                                        },
-                                        Some(Scancode::Num5) | Some(Scancode::Kp5) if (self.cpu.registers.get(x).unwrap() == 5) => {
-                                            skip = false;
-                                            break;
-                                        },
-                                        Some(Scancode::Num6) | Some(Scancode::Kp6) if (self.cpu.registers.get(x).unwrap() == 6) => {
-                                            skip = false;
-                                            break;
-                                        },
-                                        Some(Scancode::Num7) | Some(Scancode::Kp7) if (self.cpu.registers.get(x).unwrap() == 7) => {
-                                            skip = false;
-                                            break;
-                                        },
-                                        Some(Scancode::Num8) | Some(Scancode::Kp8) if (self.cpu.registers.get(x).unwrap() == 8) => {
-                                            skip = false;
-                                            break;
-                                        },
-                                        Some(Scancode::Num9) | Some(Scancode::Kp9) if (self.cpu.registers.get(x).unwrap() == 9) => {
-                                            skip = false;
-                                            break;
-                                        },
-                                        Some(Scancode::A) if (self.cpu.registers.get(x).unwrap() == 0xa) => {
-                                            skip = false;
-                                            break;
-                                        },
-                                        Some(Scancode::B) if (self.cpu.registers.get(x).unwrap() == 0xb) => {
-                                            skip = false;
-                                            break;
-                                        },
-                                        Some(Scancode::C) if (self.cpu.registers.get(x).unwrap() == 0xc) => {
-                                            skip = false;
-                                            break;
-                                        },
-                                        Some(Scancode::D) if (self.cpu.registers.get(x).unwrap() == 0xd) => {
-                                            skip = false;
-                                            break;
-                                        },
-                                        Some(Scancode::E) if (self.cpu.registers.get(x).unwrap() == 0xe) => {
-                                            skip = false;
-                                            break;
-                                        },
-                                        Some(Scancode::F) if (self.cpu.registers.get(x).unwrap() == 0xf) => {
-                                            skip = false;
-                                            break;
-                                        },
-                                        _ => {}
-                                    }
-                                },
-                                _ => {},
-                            }
+                        let reg_value = self.cpu.registers.get(x).unwrap();
+                        self.event_pump.pump_events();
+                        let keyboard_state = self.event_pump.keyboard_state();
+
+                        let pressed_keys: HashSet<Scancode> = keyboard_state.pressed_scancodes().collect();
+                        match reg_value {
+                            0 => { if pressed_keys.contains(&Scancode::Num0) || pressed_keys.contains(&Scancode::Kp0) { skip = false } },
+                            1 => { if pressed_keys.contains(&Scancode::Num1) || pressed_keys.contains(&Scancode::Kp1) { skip = false } },
+                            2 => { if pressed_keys.contains(&Scancode::Num2) || pressed_keys.contains(&Scancode::Kp2) { skip = false } },
+                            3 => { if pressed_keys.contains(&Scancode::Num3) || pressed_keys.contains(&Scancode::Kp3) { skip = false } },
+                            4 => { if pressed_keys.contains(&Scancode::Num4) || pressed_keys.contains(&Scancode::Kp4) { skip = false } },
+                            5 => { if pressed_keys.contains(&Scancode::Num5) || pressed_keys.contains(&Scancode::Kp5) { skip = false } },
+                            6 => { if pressed_keys.contains(&Scancode::Num6) || pressed_keys.contains(&Scancode::Kp6) { skip = false } },
+                            7 => { if pressed_keys.contains(&Scancode::Num7) || pressed_keys.contains(&Scancode::Kp7) { skip = false } },
+                            8 => { if pressed_keys.contains(&Scancode::Num8) || pressed_keys.contains(&Scancode::Kp8) { skip = false } },
+                            9 => { if pressed_keys.contains(&Scancode::Num9) || pressed_keys.contains(&Scancode::Kp9) { skip = false } },
+                            0xa => { if pressed_keys.contains(&Scancode::A) { skip = false } },
+                            0xb => { if pressed_keys.contains(&Scancode::B) { skip = false } },
+                            0xc => { if pressed_keys.contains(&Scancode::C) { skip = false } },
+                            0xd => { if pressed_keys.contains(&Scancode::D) { skip = false } },
+                            0xe => { if pressed_keys.contains(&Scancode::E) { skip = false } },
+                            0xf => { if pressed_keys.contains(&Scancode::F) { skip = false } },
+                            _ => {}
                         }
+
                         if skip {
                             self.cpu.registers.pc += INSTRUCTION_WIDTH as u16;
                         }
@@ -665,7 +643,6 @@ impl <'a> Interpreter<'a> {
                             let event = self.event_pump.wait_event();
                             match event {
                                 Event::KeyDown{keycode: kc, ..} => {
-                                    //println!("Keycode:\n{:?}\n", kc);
                                     match kc {
                                         Some(Keycode::Num0) | Some(Keycode::Kp0) => {
                                             self.cpu.registers.set(x, 0);
