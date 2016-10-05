@@ -6,6 +6,8 @@ use std::path::Path;
 use std::thread;
 use std::time::{Duration, SystemTime};
 use std::collections::HashSet;
+use std::process;
+use std::error::Error;
 use cpu::Cpu;
 
 use self::sdl2::render::Renderer;
@@ -104,16 +106,16 @@ struct VideoSystem<'a> {
 
 impl <'a> VideoSystem<'a> {
     fn default(video_sys: &VideoSubsystem) -> Self {
-        let window = video_sys.window(DEFAULT_WINDOW_TITLE,
+        let window = item_or_exit(video_sys.window(DEFAULT_WINDOW_TITLE,
                             SCREEN_WIDTH as u32 * DEFAULT_VIDEO_SCALE as u32,
-                            SCREEN_HEIGHT as u32 * DEFAULT_VIDEO_SCALE as u32).build().unwrap();
+                            SCREEN_HEIGHT as u32 * DEFAULT_VIDEO_SCALE as u32).build());
 
         VideoSystem {
             width: SCREEN_WIDTH,
             height: SCREEN_HEIGHT,
             scale_factor: DEFAULT_VIDEO_SCALE,
             memory: vec![false; ((SCREEN_WIDTH as usize) * (SCREEN_HEIGHT as usize))],
-            renderer: window.renderer().present_vsync().build().unwrap(),
+            renderer: item_or_exit(window.renderer().present_vsync().build()),
             draw: true,
         }
     }
@@ -232,10 +234,10 @@ pub struct Interpreter<'a> {
 impl <'a> Interpreter<'a> {
     /// Creates and initializes an interpreter
     pub fn new() -> Interpreter<'a> {
-        let sdl_ctxt = sdl2::init().unwrap();
-        let au_sys = sdl_ctxt.audio().unwrap();
-        let vd_sys = sdl_ctxt.video().unwrap();
-        let evt_pump = sdl_ctxt.event_pump().unwrap();
+        let sdl_ctxt = item_or_exit(sdl2::init());
+        let au_sys = item_or_exit(sdl_ctxt.audio());
+        let vd_sys = item_or_exit(sdl_ctxt.video());
+        let evt_pump = item_or_exit(sdl_ctxt.event_pump());
 
         let mut interpreter = Interpreter {
             cpu: Cpu::init(),
@@ -244,13 +246,13 @@ impl <'a> Interpreter<'a> {
             delay_timer: 0,
             sound_timer: 0,
             sdl: sdl_ctxt,
-            sound_system: SoundSystem::new(au_sys.open_playback(None, &DESIRED_AUDIO_SPEC, |spec| {
+            sound_system: SoundSystem::new(item_or_exit(au_sys.open_playback(None, &DESIRED_AUDIO_SPEC, |spec| {
                 Tone {
                     phase_inc: 440.0 / spec.freq as f32,
                     phase: 0.0,
                     volume: 0.5,
                 }
-            }).unwrap()),
+            }))),
             video_system: VideoSystem::default(&vd_sys),
             event_pump: evt_pump,
         };
@@ -262,11 +264,11 @@ impl <'a> Interpreter<'a> {
 
     /// Loads a program into the interpreter from the file pointed to by path argument
     pub fn load_program_from_file(&mut self, path: &Path) {
-        let mut file = File::open(path).unwrap();
+        let mut file = item_or_exit(File::open(path));
         let mut mem_idx = INTERPRETER_END as usize;
         let mut buf = [0 as u8; 2];
         loop {
-            let rc = file.read(&mut buf).unwrap();
+            let rc = item_or_exit(file.read(&mut buf));
             if (mem_idx >= self.memory.len() - 1) || rc != 2 {
                 break;
             }
