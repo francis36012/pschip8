@@ -829,3 +829,15 @@ fn u8_to_bcd(input: u8) -> [u8; 3] {
 
     result
 }
+
+/// Takes a result object and returns the inner item or prints the error item
+/// and exits the process
+fn item_or_exit<T, E: ::std::fmt::Display>(res: Result<T, E>) -> T {
+    match res {
+        Ok(i) => {i}
+        Err(e) => {
+            println!("{}", e);
+            process::exit(1);
+        }
+    }
+}
