@@ -7,11 +7,11 @@ use std::thread;
 use std::time::{Duration, SystemTime};
 use std::collections::HashSet;
 use std::process;
-use std::error::Error;
 use cpu::Cpu;
 
 use self::sdl2::render::Renderer;
 use self::sdl2::event::Event;
+use self::sdl2::keyboard;
 use self::sdl2::keyboard::Keycode;
 use self::sdl2::keyboard::Scancode;
 use self::sdl2::{VideoSubsystem, Sdl, EventPump};
@@ -120,6 +120,7 @@ impl <'a> VideoSystem<'a> {
         }
     }
 
+    #[allow(unused)]
     fn draw(&mut self, x: u8, y: u8, sprite: &[u8]) -> bool {
         let time_start = SystemTime::now();
         let mut erased = false;
@@ -153,7 +154,7 @@ impl <'a> VideoSystem<'a> {
         if !self.draw {
             return;
         }
-        self.renderer.set_scale(self.scale_factor as f32, self.scale_factor as f32);
+        let _ = self.renderer.set_scale(self.scale_factor as f32, self.scale_factor as f32);
         self.renderer.set_draw_color(Color::RGB(0, 0, 0));
         self.renderer.clear();
 
@@ -167,7 +168,7 @@ impl <'a> VideoSystem<'a> {
                 Color::RGB(0, 0, 0)
             };
             self.renderer.set_draw_color(color);
-            self.renderer.draw_point(Point::new(x as i32, y as i32));
+            let _ = self.renderer.draw_point(Point::new(x as i32, y as i32));
         }
         self.renderer.present();
         self.draw = false;
@@ -219,6 +220,8 @@ impl SoundSystem {
         }
     }
 }
+
+#[allow(unused)]
 pub struct Interpreter<'a> {
     cpu: Cpu,
     memory: [u8; MEMORY_SIZE as usize],
@@ -644,7 +647,7 @@ impl <'a> Interpreter<'a> {
                         'event_loop: loop {
                             let event = self.event_pump.wait_event();
                             match event {
-                                Event::KeyDown{keycode: kc, ..} => {
+                                Event::KeyDown{keycode: kc, keymod: km, ..} => {
                                     match kc {
                                         Some(Keycode::Num0) | Some(Keycode::Kp0) => {
                                             self.cpu.registers.set(x, 0);
@@ -710,11 +713,23 @@ impl <'a> Interpreter<'a> {
                                             self.cpu.registers.set(x, 0xf);
                                             break 'event_loop
                                         },
+                                        // possible interpreter restart
+                                        Some(Keycode::R) => {
+                                            if km.contains(keyboard::LSHIFTMOD) ||
+                                               km.contains(keyboard::RSHIFTMOD) {
+                                                self.cpu.registers.pc = 0;
+                                                self.video_system.clear_screen();
+                                                return;
+                                            }
+                                        },
                                         // If the keycode does not match [0-9a-f] continue the loop
                                         _ => {}
                                     }
                                 },
-                                        // If the event is not a keydown event, continue the loop
+                                Event::Quit{..} => {
+                                    process::exit(0);
+                                },
+                                // If the event is not a keydown event, continue the loop
                                 _ => {}
                             }
                         }
@@ -783,6 +798,22 @@ impl <'a> Interpreter<'a> {
         // nanoseconds per frame
         let spf_nano = Duration::new(0, 1_000_000);
         loop {
+            self.event_pump.pump_events();
+            match self.event_pump.poll_event() {
+                Some(Event::Quit{..}) => { return },
+                Some(Event::KeyDown{..}) => {
+                    let keyboard_state = self.event_pump.keyboard_state();
+                    let pressed_keys: HashSet<Scancode> = keyboard_state.pressed_scancodes().collect();
+
+                    // restart
+                    if pressed_keys.contains(&Scancode::LShift) && pressed_keys.contains(&Scancode::R) ||
+                       pressed_keys.contains(&Scancode::RShift) && pressed_keys.contains(&Scancode::R) {
+                        self.cpu.registers.pc = 0;
+                        self.video_system.clear_screen();
+                    }
+                },
+                _ => {}
+            };
             let time_start = SystemTime::now();
             self.cycle();
             self.timer_routine();
